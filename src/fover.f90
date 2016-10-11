@@ -306,22 +306,24 @@ contains
     if (val == 0) then
       call tokenize(main, val, msg, toks_main)
       if (val == 0) then
-        select case(size(toks_main))
-        case (0)
+        if (.not. allocated(toks_main)) then
           val = 8
           msg = "major, minor, and patch versions are missing"
-        case (1)
-          val = 9
-          msg = "minor and patch versions are missing"
-        case (2)
-          val = 10
-          msg = "patch version is missing"
-        case (3)
-          ! correct
-        case default
-          val = 11
-          msg = "main version contains too many tokens"
-        end select
+        else
+          select case(size(toks_main))
+            case (1)
+              val = 9
+              msg = "minor and patch versions are missing"
+            case (2)
+              val = 10
+              msg = "patch version is missing"
+            case (3)
+              ! correct
+            case default
+              val = 11
+              msg = "main version contains too many tokens"
+          end select
+        endif
       else
         val = val + 11
         msg = "invalid main version: " // msg
@@ -360,8 +362,8 @@ contains
       read(toks_main(1), *)ver%major
       read(toks_main(2), *)ver%minor
       read(toks_main(3), *)ver%patch
-      ver%pre = toks_pre
-      ver%meta = toks_meta
+      if (allocated(toks_pre)) ver%pre = toks_pre
+      if (allocated(toks_meta)) ver%meta = toks_meta
     else                  ! remain empty
       msg = msgpre // msg
     end if
@@ -574,6 +576,8 @@ contains
     val = 0
     msg = ""
 
+    if (len_trim(str) == 0) return
+
     allocate(tmp_toks(20))
 
     i=1
@@ -653,7 +657,7 @@ contains
 
   function pre_meta_valid(pre_meta, nm, err_base, msg) result(val)
     !* check if the pre-release or metadata is valid (every token is valid)
-    character(len=max_token_length), dimension(:), intent(in) :: pre_meta
+    character(len=max_token_length), dimension(:), allocatable, intent(in) :: pre_meta
     character(len=*), intent(in) :: nm
     integer, intent(in) :: err_base
     character(len=:), allocatable, intent(out) :: msg
@@ -663,8 +667,11 @@ contains
 
     val = 0
     msg = ""
+    
+    if (.not. allocated(pre_meta)) return
 
     do itok = 1, size(pre_meta)
+      if (len_trim(pre_meta(itok)) == 0) cycle
       val = token_valid(trim(adjustl(pre_meta(itok))), msg)
       if (val /= 0) then
         val = val + err_base
